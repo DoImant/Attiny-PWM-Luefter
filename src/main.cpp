@@ -5,6 +5,7 @@
 ///        This program is supposed to control a PWM fan.
 ///        For this purpose, the temperature is determined via an analog input and,
 ///        depending on this, the speed of the fan is regulated using a 25 kHz PWM signal.
+///        The 8-bit timer1 is used to generate the PWM signal.
 ///
 /// @date 2023-12-31
 /// @version 1.0
@@ -136,10 +137,41 @@ uint16_t adcReadAvg(uint8_t nsamples) {
 /// @param dutyCycle
 /// @param pwmFreq
 //////////////////////////////////////////////////////////////////////////////
-void initPwmSignal(uint8_t pwmFreq, uint8_t dutyCycle) {
+void pwmInit(uint8_t pwmFreq, uint8_t dutyCycle) {
   TCCR1 = _BV(PWM1A) | _BV(COM1A1) | _BV(CS11);
   OCR1A = dutyCycle;   // Set initial duty cycle
   OCR1C = pwmFreq;     // Set Top-Value for 25kHz
+}
+
+//////////////////////////////////////////////////////////////////////////////
+/// @brief Set the duty cycle of the PWM signal
+///
+/// @param adcVal
+//////////////////////////////////////////////////////////////////////////////
+void pwmSetDutyCycle(uint16_t adcVal) {
+  uint16_t adcCalc = (adcVal < ADCVAL_MIN_THRESHOLD)   ? ADCVAL_MIN_THRESHOLD
+                     : (adcVal > ADCVAL_MAX_THRESHOLD) ? ADCVAL_MAX_THRESHOLD
+                                                       : adcVal;
+  OCR1A = static_cast<uint8_t>((PWMFREQUENCY_DIFF * ((adcCalc - ADCVAL_MIN_THRESHOLD) * 100U / ADCMAX_DIFF) / 100U) +
+                               MIN_PWM_FREQUENCY);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+/// @brief Displays the revolutions/min of the fan
+///
+/// @param freq
+//////////////////////////////////////////////////////////////////////////////
+void printRPM(uint32_t freq) {
+  mySerial.print("Frequenz1: ");
+  mySerial.print(freq / 100);
+  mySerial.print('.');
+  mySerial.print(freq % 100);
+  mySerial.println("Hz");
+
+  freq *= 60;
+  freq /= 200;
+  mySerial.print("RPM1: ");
+  mySerial.println(freq);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -169,53 +201,35 @@ void setup() {
 
   initINT0();
   initAdc();
-  initPwmSignal(MAX_PWM_FREQUENCY, MIN_PWM_FREQUENCY);
+  pwmInit(MAX_PWM_FREQUENCY, MIN_PWM_FREQUENCY);
   sei();
   mySerial.begin(9600);
 }
 
 void loop() {
-  static uint16_t oldValue {0};
+  static uint16_t prevAdcRaw {0};
   static uint8_t avgIdx {0};
   static uint8_t show {0};
 
   uint16_t adcRaw = adcReadAvg(4);
-  if (adcRaw != oldValue) {
-    oldValue = adcRaw;
-    uint16_t adcCalc;
-    if (adcRaw < ADCVAL_MIN_THRESHOLD) {   // Even if the temperature is lower,
-      adcCalc = ADCVAL_MIN_THRESHOLD;      // the fan speed should correspond to that
-                                           // at 25 °C
-    } else if (adcRaw > ADCVAL_MAX_THRESHOLD) {
-      adcCalc = ADCVAL_MAX_THRESHOLD;
-    } else {
-      adcCalc = adcRaw;
-    }
-    OCR1A = static_cast<uint8_t>((PWMFREQUENCY_DIFF * ((adcCalc - ADCVAL_MIN_THRESHOLD) * 100U / ADCMAX_DIFF) / 100U) +
-                                 MIN_PWM_FREQUENCY);
+  if (adcRaw != prevAdcRaw) {
+    prevAdcRaw = adcRaw;
+    pwmSetDutyCycle(adcRaw);
   }
+  if (timer(INTERVAL_MS) == true) {   // True when the interval of INTERVAL_MS has expired
+    timer.start();                    // start nect interval
 
-  if (timer(INTERVAL_MS) == true) {
     uint32_t frequency {0};
     if (durationInt0 > 0) { frequency = 100000000 / durationInt0; }
     rpmSigValues[avgIdx] = frequency;
-    frequency = getAverage(rpmSigValues);
     if (++avgIdx >= MAX_AVERAGE_IDX) { avgIdx = 0; }
 
+    // Only display the RPM once the array for calculating the average values has been completely written to.
     if (show < (MAX_AVERAGE_IDX + 1)) {
       ++show;
     } else {
-      mySerial.print("Frequenz1: ");
-      mySerial.print(frequency / 100);
-      mySerial.print('.');
-      mySerial.print(frequency % 100);
-      mySerial.println("Hz");
-
-      frequency *= 60;
-      frequency /= 200;
-      mySerial.print("RPM1: ");
-      mySerial.println(frequency);
+      frequency = getAverage(rpmSigValues);
+      printRPM(frequency);
     }
-    timer.start();
   }
 }
