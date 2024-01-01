@@ -24,4 +24,4 @@ Pin 8 VCC = +5V
 
 ## An example circuit
 
-[Circuit diagram](/docu/PWM-FAN-Control.pdf?raw=true)
+[Circuit diagram](/docu/PWM-FAN-Control.pdf)
