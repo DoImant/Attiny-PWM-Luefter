@@ -16,11 +16,9 @@
 #include <Arduino.h>
 #include <SendOnlySoftwareSerial.h>   //  https://github.com/nickgammon/SendOnlySoftwareSerial
 
-
-
 //////////////////////////////////////////////////////////////////////////////
 /// @brief Helper class for simplified use of millis()
-/// 
+///
 //////////////////////////////////////////////////////////////////////////////
 class Timer {
 public:
@@ -33,10 +31,10 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 /// @brief  Class for calculating a simple average value
-/// 
-/// @tparam T 
-/// @tparam ITEMS 
-/// @return T 
+///
+/// @tparam T
+/// @tparam ITEMS
+/// @return T
 //////////////////////////////////////////////////////////////////////////////
 template <typename T, size_t ITEMS> T getAverage(const T (&dataArray)[ITEMS]) {
   T tmp = 0;
@@ -64,7 +62,7 @@ constexpr uint16_t ADCMAX_DIFF {ADCVAL_MAX_THRESHOLD - ADCVAL_MIN_THRESHOLD};
 // Set PWM frequency to (16MHz / 4) / (159 + 1) = 25KHz -> Prescaler = 4
 constexpr uint8_t MAX_PWM_FREQUENCY {160};
 constexpr uint8_t MIN_PWM_FREQUENCY {32};
-constexpr uint8_t PWMFREQUENZ_DIFF {MAX_PWM_FREQUENCY - MIN_PWM_FREQUENCY};
+constexpr uint8_t PWMFREQUENCY_DIFF {MAX_PWM_FREQUENCY - MIN_PWM_FREQUENCY};
 
 constexpr uint8_t TX {PB0};
 constexpr uint16_t INTERVAL_MS {1000};
@@ -83,7 +81,7 @@ uint32_t rpmSigValues[MAX_AVERAGE_IDX];
 
 //////////////////////////////////////////////////////////////////////////////
 /// @brief ISR for the frequency counter
-/// 
+///
 //////////////////////////////////////////////////////////////////////////////
 ISR(INT0_vect) {
   uint32_t timestamp = micros();
@@ -93,7 +91,7 @@ ISR(INT0_vect) {
 
 //////////////////////////////////////////////////////////////////////////////
 /// @brief Determine the frequency of a square wave signal on the INT0 pin (PB2).
-/// 
+///
 //////////////////////////////////////////////////////////////////////////////
 void initINT0() {
   // Set MCU Control Register = Interrupt Sense Control Bits
@@ -102,10 +100,10 @@ void initINT0() {
   MCUCR = (1 << ISC01) | (1 << ISC00);
   GIMSK = (1 << INT0) | (0 << PCIE);   // Set GIMSK – General Interrupt Mask Register = enable INT0
 }
- 
+
 //////////////////////////////////////////////////////////////////////////////
 /// @brief Init the Analog to Digital Converter for reading data from Pin PB4
-/// 
+///
 //////////////////////////////////////////////////////////////////////////////
 void initAdc() {
   ADMUX |= _BV(MUX1);   // use ADC2 for input (PB4), MUX bit 1
@@ -135,13 +133,13 @@ uint16_t adcReadAvg(uint8_t nsamples) {
 ///        Output is PB1 OC1A (non inverted). Inverted Output is
 ///        not connected
 ///
-/// @param dutyCycle 
-/// @param pwmFreq 
+/// @param dutyCycle
+/// @param pwmFreq
 //////////////////////////////////////////////////////////////////////////////
 void initPwmSignal(uint8_t pwmFreq, uint8_t dutyCycle) {
   TCCR1 = _BV(PWM1A) | _BV(COM1A1) | _BV(CS11);
   OCR1A = dutyCycle;   // Set initial duty cycle
-  OCR1C = pwmFreq;     // Set Top-Value for 25kHz 
+  OCR1C = pwmFreq;     // Set Top-Value for 25kHz
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -193,7 +191,7 @@ void loop() {
     } else {
       adcCalc = adcRaw;
     }
-    OCR1A = static_cast<uint8_t>((PWMFREQUENZ_DIFF * ((adcCalc - ADCVAL_MIN_THRESHOLD) * 100U / ADCMAX_DIFF) / 100U) +
+    OCR1A = static_cast<uint8_t>((PWMFREQUENCY_DIFF * ((adcCalc - ADCVAL_MIN_THRESHOLD) * 100U / ADCMAX_DIFF) / 100U) +
                                  MIN_PWM_FREQUENCY);
   }
 
